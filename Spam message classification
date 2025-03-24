@@ -1,0 +1,148 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import nltk
+nltk.download('stopwords')
+import string
+#to show maximum amount of columns
+pd.set_option('display.max_columns', None)
+from nltk.corpus import  stopwords
+#for stemming
+from nltk.stem.porter import PorterStemmer
+ps = PorterStemmer()
+import wordcloud
+
+#import the csv file
+df = pd.read_csv(r"C:\Users\User\Downloads\Documents\spam.csv", encoding="ISO-8859-1")
+
+
+#*************data cleaning and check for missing values************************
+df.drop(columns = ['Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4'], inplace = True)
+
+df.rename(columns = {'v1':'target', 'v2':'text'}, inplace = True)
+
+from sklearn.preprocessing import LabelEncoder
+encoder = LabelEncoder()
+df['target'] = encoder.fit_transform(df['target'])
+
+#perfrom eda, since this is a text based dataset, it will be a bit hard to run most categorical plot since most of them takes int values
+df = df.drop_duplicates(keep='first')
+#plt.pie(df['target'].value_counts(), labels = ['ham', 'spam'], autopct="%0.2f")
+#plt.show()
+
+nltk.download('punkt_tab')
+nltk.download('punkt')
+df['num_characters'] = (df['text'].apply(len))
+df['text'] = df['text'].fillna("")
+df['num_words'] = df['text'].apply(lambda x : len(nltk.word_tokenize(x)))
+
+df['num_sentences'] = df['text'].apply(lambda x : len(nltk.sent_tokenize(x)))
+
+#find out the descriptions on how spam or ham works by finding out how many words, or sentenses are used in a message
+#average of all sentences
+#print(df[['num_characters', 'num_words', 'num_sentences']].describe())
+#print('\n')
+#average of ham messages
+#print(df[df['target'] == 0][['num_characters', 'num_words', 'num_sentences']].describe())
+#print('\n')
+#average of spam messages
+#print(df[df['target'] == 1][['num_characters', 'num_words', 'num_sentences']].describe())
+
+#print(df.head())
+
+#create a histogram for better understanding
+#sns.histplot(df[df['target']==0]['num_words'])
+#plt.show()
+
+#sns.pairplot(df, hue = 'target')
+#here we have to take another dataset without the text column becauyse the tyext column contains string values, which cannot be converted or showed into a heatmap
+
+#ds = df.drop(columns = ['text'])
+#sns.heatmap(ds.corr(), annot=True)
+#plt.show()
+
+
+#**************************TEXT PREPROCESSING**************************
+#convert to lowecase, tokenize them, remove special characters, remove stop words and punctuations, stemming
+#stemming means making similar words into the same types of words, like making dancing, dances, danced, dance into dance. cz they have the similar meaning with different types of verb
+
+def transform_text(text):
+    #lowercase
+    text = text.lower()
+    #tokenizer
+    text = nltk.word_tokenize(text)
+
+    #remove all the special characters and punctuations and stopwords.
+    y = []
+    for i in text:
+        if i.isalnum():
+            y.append(i)
+    text = y[:]
+    y.clear()
+    for i in  text:
+        if i not in stopwords.words('english') and i not in string.punctuation:
+            y.append(i)
+
+    text = y[:]
+    for i in text:
+        y.append(ps.stem(i))
+
+    return " ".join(y)
+
+#print(transform_text(df['text'][10]))
+#print(stopwords.words('english'))
+#print(string.punctuation)
+
+#stemming, root form of all words
+
+df['transformed_text'] = df['text'].apply(transform_text)
+#print(df.head())
+
+#*************find out the most used words in spam and ham messages*********
+from wordcloud import WordCloud
+wc = WordCloud(width=500, height=500, min_font_size=10, background_color='white')
+
+#spam_wc = wc.generate(df[df['target'] == 1]['transformed_text'].str.cat(sep=" "))
+#plt.figure(figsize=(15,10))
+#plt.imshow(spam_wc)
+#plt.show()
+
+
+#ham_wc = wc.generate(df[df['target'] == 0]['transformed_text'].str.cat(sep=" "))
+#plt.figure(figsize=(15,10))
+#plt.imshow(ham_wc)
+#plt.show()
+
+#find top 30 words in ham/spam messages
+#spam_corpus = []
+#for msg in df[df['target']==1]['transformed_text'].tolist():
+    #for word in msg.split():
+        #spam_corpus.append(word)
+
+from collections import Counter
+#common_words = pd.DataFrame(Counter(spam_corpus).most_common(30), columns=["word", "count"])
+
+# Plot using Seaborn
+#plt.figure(figsize=(10, 5))
+#sns.barplot(x="word", y="count", data=common_words)
+#plt.xticks(rotation='vertical')
+#plt.show()
+
+
+#ham_corpus = []
+#for msg in df[df['target']==1]['transformed_text'].tolist():
+    #for word in msg.split():
+        #ham_corpus.append(word)
+
+#common_words_two = pd.DataFrame(Counter(ham_corpus).most_common(30), columns=["word", "count"])
+
+# Plot using Seaborn
+#plt.figure(figsize=(10, 5))
+#sns.barplot(x="word", y="count", data=common_words_two)
+#plt.xticks(rotation='vertical')
+#plt.show()
+
+
+
+#********************MODEL BUILDING***************************
