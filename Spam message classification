@@ -1,148 +1,123 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 import nltk
-nltk.download('stopwords')
 import string
-#to show maximum amount of columns
-pd.set_option('display.max_columns', None)
-from nltk.corpus import  stopwords
-#for stemming
+from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
-ps = PorterStemmer()
-import wordcloud
-
-#import the csv file
-df = pd.read_csv(r"C:\Users\User\Downloads\Documents\spam.csv", encoding="ISO-8859-1")
-
-
-#*************data cleaning and check for missing values************************
-df.drop(columns = ['Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4'], inplace = True)
-
-df.rename(columns = {'v1':'target', 'v2':'text'}, inplace = True)
-
 from sklearn.preprocessing import LabelEncoder
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, confusion_matrix, precision_score
+
+
+nltk.download('stopwords')
+nltk.download('punkt')
+
+
+ps = PorterStemmer()
+
+# Load dataset
+df = pd.read_csv(r"C:\Users\User\Downloads\Documents\spam.csv", encoding="ISO-8859-1")
+df.drop(columns=['Unnamed: 2', 'Unnamed: 3', 'Unnamed: 4'], inplace=True)
+df.rename(columns={'v1': 'target', 'v2': 'text'}, inplace=True)
+
+# Encode target labels
 encoder = LabelEncoder()
 df['target'] = encoder.fit_transform(df['target'])
 
-#perfrom eda, since this is a text based dataset, it will be a bit hard to run most categorical plot since most of them takes int values
+# Remove duplicates and handle missing
 df = df.drop_duplicates(keep='first')
-#plt.pie(df['target'].value_counts(), labels = ['ham', 'spam'], autopct="%0.2f")
-#plt.show()
-
-nltk.download('punkt_tab')
-nltk.download('punkt')
-df['num_characters'] = (df['text'].apply(len))
 df['text'] = df['text'].fillna("")
-df['num_words'] = df['text'].apply(lambda x : len(nltk.word_tokenize(x)))
 
-df['num_sentences'] = df['text'].apply(lambda x : len(nltk.sent_tokenize(x)))
+# Text preprocessing function
+def transform_text(text):
+    text = text.lower()
+    text = nltk.word_tokenize(text)
+    text = [i for i in text if i.isalnum()]
+    text = [i for i in text if i not in stopwords.words('english')]
+    text = [ps.stem(i) for i in text]
+    return " ".join(text)
 
-#find out the descriptions on how spam or ham works by finding out how many words, or sentenses are used in a message
-#average of all sentences
-#print(df[['num_characters', 'num_words', 'num_sentences']].describe())
-#print('\n')
-#average of ham messages
-#print(df[df['target'] == 0][['num_characters', 'num_words', 'num_sentences']].describe())
-#print('\n')
-#average of spam messages
-#print(df[df['target'] == 1][['num_characters', 'num_words', 'num_sentences']].describe())
+# Apply transformation
+df['transformed_text'] = df['text'].apply(transform_text)
 
-#print(df.head())
+# TF-IDF Vectorization
+tfidf = TfidfVectorizer(max_features=3000)
+X = tfidf.fit_transform(df['transformed_text']).toarray()
+y = df['target'].values
 
-#create a histogram for better understanding
-#sns.histplot(df[df['target']==0]['num_words'])
-#plt.show()
+# Train/test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=2)
 
-#sns.pairplot(df, hue = 'target')
-#here we have to take another dataset without the text column becauyse the tyext column contains string values, which cannot be converted or showed into a heatmap
+# Train Multinomial Naive Bayes model
+model = MultinomialNB()
+model.fit(X_train, y_train)
 
-#ds = df.drop(columns = ['text'])
-#sns.heatmap(ds.corr(), annot=True)
-#plt.show()
+# Evaluate (optional)
+y_pred = model.predict(X_test)
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("Precision:", precision_score(y_test, y_pred))
+print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
+
+# -------------------------------
+# Message Input for Prediction
+# -------------------------------
+print("\n--- SPAM CLASSIFIER ---")
+while True:
+    user_input = input("\nEnter a message (or type 'exit' to quit):\n> ")
+    if user_input.lower() == 'exit':
+        break
+    transformed = transform_text(user_input)
+    vectorized = tfidf.transform([transformed]).toarray()
+    prediction = model.predict(vectorized)[0]
+    print("Prediction:", "Spam ❌" if prediction == 1 else "Ham ✅")
 
 
-#**************************TEXT PREPROCESSING**************************
-#convert to lowecase, tokenize them, remove special characters, remove stop words and punctuations, stemming
-#stemming means making similar words into the same types of words, like making dancing, dances, danced, dance into dance. cz they have the similar meaning with different types of verb
+
+
+
+
+
+
+
+
+
+
+from flask import Flask, render_template, request
+import nltk
+import string
+import pickle
+from nltk.corpus import stopwords
+from nltk.stem.porter import PorterStemmer
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+app = Flask(__name__)
+
+# Load your trained model and tfidf vectorizer
+model = pickle.load(open('model.pkl', 'rb'))
+tfidf = pickle.load(open('vectorizer.pkl', 'rb'))
+
+ps = PorterStemmer()
+nltk.download('stopwords')
+nltk.download('punkt')
 
 def transform_text(text):
-    #lowercase
     text = text.lower()
-    #tokenizer
-    text = nltk.word_tokenize(text)
+    tokens = nltk.word_tokenize(text)
+    filtered = [ps.stem(word) for word in tokens if word.isalnum() and word not in stopwords.words('english')]
+    return " ".join(filtered)
 
-    #remove all the special characters and punctuations and stopwords.
-    y = []
-    for i in text:
-        if i.isalnum():
-            y.append(i)
-    text = y[:]
-    y.clear()
-    for i in  text:
-        if i not in stopwords.words('english') and i not in string.punctuation:
-            y.append(i)
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    result = ""
+    if request.method == 'POST':
+        input_text = request.form['message']
+        transformed = transform_text(input_text)
+        vector_input = tfidf.transform([transformed]).toarray()
+        prediction = model.predict(vector_input)[0]
+        result = "Spam 🚫" if prediction == 1 else "Not Spam ✅"
+    return render_template('index.html', result=result)
 
-    text = y[:]
-    for i in text:
-        y.append(ps.stem(i))
-
-    return " ".join(y)
-
-#print(transform_text(df['text'][10]))
-#print(stopwords.words('english'))
-#print(string.punctuation)
-
-#stemming, root form of all words
-
-df['transformed_text'] = df['text'].apply(transform_text)
-#print(df.head())
-
-#*************find out the most used words in spam and ham messages*********
-from wordcloud import WordCloud
-wc = WordCloud(width=500, height=500, min_font_size=10, background_color='white')
-
-#spam_wc = wc.generate(df[df['target'] == 1]['transformed_text'].str.cat(sep=" "))
-#plt.figure(figsize=(15,10))
-#plt.imshow(spam_wc)
-#plt.show()
-
-
-#ham_wc = wc.generate(df[df['target'] == 0]['transformed_text'].str.cat(sep=" "))
-#plt.figure(figsize=(15,10))
-#plt.imshow(ham_wc)
-#plt.show()
-
-#find top 30 words in ham/spam messages
-#spam_corpus = []
-#for msg in df[df['target']==1]['transformed_text'].tolist():
-    #for word in msg.split():
-        #spam_corpus.append(word)
-
-from collections import Counter
-#common_words = pd.DataFrame(Counter(spam_corpus).most_common(30), columns=["word", "count"])
-
-# Plot using Seaborn
-#plt.figure(figsize=(10, 5))
-#sns.barplot(x="word", y="count", data=common_words)
-#plt.xticks(rotation='vertical')
-#plt.show()
-
-
-#ham_corpus = []
-#for msg in df[df['target']==1]['transformed_text'].tolist():
-    #for word in msg.split():
-        #ham_corpus.append(word)
-
-#common_words_two = pd.DataFrame(Counter(ham_corpus).most_common(30), columns=["word", "count"])
-
-# Plot using Seaborn
-#plt.figure(figsize=(10, 5))
-#sns.barplot(x="word", y="count", data=common_words_two)
-#plt.xticks(rotation='vertical')
-#plt.show()
-
-
-
-#********************MODEL BUILDING***************************
+if __name__ == '__main__':
+    app.run(debug=True)
