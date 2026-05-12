@@ -24,3 +24,33 @@ print(encoded_df.head())
 # Show column names
 print("\n\nEncoded Columns:\n")
 print(encoded_df.columns)
+
+
+
+# Label Encoding Example in Google Colab
+
+# Import libraries
+import pandas as pd
+import seaborn as sns
+from sklearn.preprocessing import LabelEncoder
+
+# Load built-in dataset from seaborn
+df = sns.load_dataset('tips')
+
+# Display original dataset
+print("Original Dataset:\n")
+print(df.head())
+
+# Create LabelEncoder object
+le = LabelEncoder()
+
+# Columns to encode
+categorical_cols = ['sex', 'smoker', 'day', 'time']
+
+# Apply Label Encoding
+for col in categorical_cols:
+    df[col] = le.fit_transform(df[col])
+
+# Display encoded dataset
+print("\n\nLabel Encoded Dataset:\n")
+print(df.head())
