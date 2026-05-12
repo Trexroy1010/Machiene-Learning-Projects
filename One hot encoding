@@ -1,0 +1,26 @@
+# One-Hot Encoding Example in Google Colab
+
+# Import libraries
+import pandas as pd
+import seaborn as sns
+
+# Load a built-in dataset from seaborn
+df = sns.load_dataset('tips')
+
+# Display first 5 rows
+print("Original Dataset:\n")
+print(df.head())
+
+# Select categorical columns
+categorical_cols = ['sex', 'smoker', 'day', 'time']
+
+# Apply One-Hot Encoding
+encoded_df = pd.get_dummies(df, columns=categorical_cols)
+
+# Display encoded dataset
+print("\n\nOne-Hot Encoded Dataset:\n")
+print(encoded_df.head())
+
+# Show column names
+print("\n\nEncoded Columns:\n")
+print(encoded_df.columns)
